@@ -42,8 +42,9 @@ contract DiamondHandsLocker {
         require(_locks[lockId].amount > 0, "No tokens to withdraw");
 
         Lock memory userLock = _locks[lockId];
-        _locks[lockId].amount = 0;
+        //_locks[lockId].amount = 0; //<= set amount to 0 before transfer !
         require(userLock.token.transfer(msg.sender, userLock.amount), "Transfer failed");
+        _locks[lockId].amount = 0; //< set amount to 0 when transfer succeed ! I dont konw lot of solidity but its better like this. no ?
 
         emit Withdrawn(msg.sender, lockId, userLock.token, userLock.amount);
     }

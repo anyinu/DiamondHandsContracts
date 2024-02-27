@@ -3,25 +3,39 @@ pragma solidity ^0.8.0;
 
 import "./DiamondHandsLinear.sol";
 import "./DiamondHandsConstant.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract DiamondHandsFactory {
+contract DiamondHandsFactory is Ownable {
 
-    uint256 public linearIdCounter = 0;
-    uint256 public constantIdCounter = 0;
+    uint256 public idCounter = 0;
+    mapping(uint256 => address) public idToAddress;
+    mapping(uint256 => bool) public isLinear;
+    mapping(address => uint256[]) public tokenToIds;
 
-    mapping(uint256 => address) public linearContracts;
-    mapping(uint256 => address) public constantContracts;
+    // Fee-related variables
+    uint256 public feeAmount;
+    IERC20 public feeToken; // The token in which fees are paid
 
-    mapping(address => uint256[]) public tokenToLinearIds;
-    mapping(address => uint256[]) public tokenToConstantIds;
+    event DiamondHandsLinearCreated(uint256 indexed id, address indexed contractAddress);
+    event DiamondHandsConstantCreated(uint256 indexed id, address indexed contractAddress);
 
-    mapping(address => address[]) public tokenToLinearAddresses;
-    mapping(address => address[]) public tokenToConstantAddresses;
+    constructor(uint256 _feeAmount, address _feeTokenAddress) {
+        feeAmount = _feeAmount;
+        feeToken = IERC20(_feeTokenAddress);
+    }
 
-    event DiamondHandsLinearCreated(uint256 indexed id, DiamondHandsLinear indexed contractAddress);
-    event DiamondHandsConstantCreated(uint256 indexed id, DiamondHandsConstant indexed contractAddress);
+    // Allows the owner to adjust the fee
+    function setFeeAmount(uint256 _newFeeAmount) public onlyOwner {
+        feeAmount = _newFeeAmount;
+    }
 
-    // New Linear Diamond Hands, boost from 1x to max starting at minDuration
+    // Allows the owner to change the fee token
+    function setFeeToken(address _newFeeTokenAddress) public onlyOwner {
+        feeToken = IERC20(_newFeeTokenAddress);
+    }
+
+    // Creation function with fee payment
     function createDiamondHandsLinear(
         address _token,
         uint256 _minLockDuration,
@@ -30,6 +44,8 @@ contract DiamondHandsFactory {
         string memory _receiptTokenName,
         string memory _receiptTokenSymbol
     ) public returns (uint256) {
+        feeToken.transferFrom(msg.sender, address(this), feeAmount);
+        
         DiamondHandsLinear newLinear = new DiamondHandsLinear(
             _token,
             _minLockDuration,
@@ -38,15 +54,15 @@ contract DiamondHandsFactory {
             _receiptTokenName,
             _receiptTokenSymbol
         );
-        uint256 id = linearIdCounter++;
-        linearContracts[id] = address(newLinear);
-        tokenToLinearIds[_token].push(id);
-        tokenToLinearAddresses[_token].push(address(newLinear));
-        emit DiamondHandsLinearCreated(id, newLinear);
+        uint256 id = idCounter++;
+        idToAddress[id] = address(newLinear);
+        isLinear[id] = true;
+        tokenToIds[_token].push(id);
+        emit DiamondHandsLinearCreated(id, address(newLinear));
         return id;
     }
 
-    // New Constant Diamond Hands, use a list to set custom durations and multipliers. 
+    // Creation function with fee payment
     function createDiamondHandsConstant(
         address _token,
         uint256[] memory _lockDurations,
@@ -54,6 +70,8 @@ contract DiamondHandsFactory {
         string memory _receiptTokenName,
         string memory _receiptTokenSymbol
     ) public returns (uint256) {
+        feeToken.transferFrom(msg.sender, address(this), feeAmount);
+        
         DiamondHandsConstant newConstant = new DiamondHandsConstant(
             _token,
             _lockDurations,
@@ -61,12 +79,17 @@ contract DiamondHandsFactory {
             _receiptTokenName,
             _receiptTokenSymbol
         );
-        uint256 id = constantIdCounter++;
-        constantContracts[id] = address(newConstant);
-        tokenToConstantIds[_token].push(id);
-        tokenToConstantAddresses[_token].push(address(newConstant));
-        emit DiamondHandsConstantCreated(id, newConstant);
+        uint256 id = idCounter++;
+        idToAddress[id] = address(newConstant);
+        isLinear[id] = false;
+        tokenToIds[_token].push(id);
+        emit DiamondHandsConstantCreated(id, address(newConstant));
         return id;
     }
 
+    // Optionally, implement a function to withdraw collected fees to a wallet
+    function withdrawFees(address _to) public onlyOwner {
+        uint256 balance = feeToken.balanceOf(address(this));
+        require(feeToken.transfer(_to, balance), "Withdrawal failed");
+    }
 }

@@ -52,7 +52,7 @@ contract DiamondHandsLinear {
     constructor(address _token, uint256 _minLockDuration, uint256 _maxLockDuration, uint256 _maxMultiplier, string memory _receiptTokenName, string memory _receiptTokenSymbol) {
         token = IERC20(_token);
         require(_maxLockDuration > _minLockDuration, "Max lock duration must be greater than min duration");
-        require(maxMultiplier < 10**28 && maxMultiplier >= 10**18, "Max multiplier must be greater than or equal to 1 and less than 10 billion");
+        require(_maxMultiplier < 10**28 && _maxMultiplier >= 10**18, "Max multiplier must be greater than or equal to 1 and less than 10 billion");
         minLockDuration = _minLockDuration;
         maxLockDuration = _maxLockDuration;
         maxMultiplier = _maxMultiplier;
